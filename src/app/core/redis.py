@@ -1,7 +1,25 @@
+import os
 import redis
+from dotenv import load_dotenv
 
-redis_client = redis.Redis(
-    host="127.0.0.1",
-    port=6379,
+load_dotenv()
+
+REDIS_URL = os.getenv("REDIS_URL")
+
+if not REDIS_URL:
+    raise RuntimeError(
+        "REDIS_URL is not configured in .env"
+    )
+
+redis_client = redis.from_url(
+    REDIS_URL,
     decode_responses=True,
 )
+
+# Optional connection test
+def check_redis_connection():
+    try:
+        redis_client.ping()
+        return True
+    except redis.RedisError:
+        return False
