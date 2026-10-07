@@ -69,7 +69,7 @@ class LoginVerify(BaseModel):
 
 class LoginResponse(BaseModel):
     phone_number: str
-
+    otp: str
 
 class LoginVerifyResponse(BaseModel):
     access_token: str

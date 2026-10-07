@@ -71,7 +71,9 @@ async def create_login(
 
     return {
         "phone_number": existing_user.phone_number,
+        "otp": otp
     }
+    
 
 
 # =========================
