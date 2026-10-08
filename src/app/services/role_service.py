@@ -12,6 +12,7 @@ from src.app.repositories.role_repository import (
     create_role,
     update_role,
     delete_role,
+    role_has_users,
 )
 
 
@@ -32,6 +33,7 @@ def create_new_role(
 
     role_data["name"] = name
 
+    # Check duplicate role
     existing_role = get_role_by_name(
         db,
         name,
@@ -91,6 +93,7 @@ def update_existing_role(
     role_data: dict,
 ):
 
+    # Find role
     role = get_role_by_id(
         db,
         role_id,
@@ -101,20 +104,29 @@ def update_existing_role(
             "Role not found"
         )
 
+    # --------------------------------------------------------
     # Remove fields that were not sent
+    # --------------------------------------------------------
+
     role_data = {
         key: value
         for key, value in role_data.items()
         if value is not None
     }
 
+    # --------------------------------------------------------
+    # Check role name
+    # --------------------------------------------------------
+
     if "name" in role_data:
 
         name = role_data["name"]
 
+        # Enum -> string
         if hasattr(name, "value"):
             name = name.value
 
+        # Check duplicate role name
         existing_role = get_role_by_name(
             db,
             name,
@@ -130,8 +142,16 @@ def update_existing_role(
 
         role_data["name"] = name
 
+    # --------------------------------------------------------
+    # Nothing to update
+    # --------------------------------------------------------
+
     if not role_data:
         return role
+
+    # --------------------------------------------------------
+    # Update role
+    # --------------------------------------------------------
 
     return update_role(
         db,
@@ -149,6 +169,10 @@ def delete_existing_role(
     role_id: int,
 ):
 
+    # --------------------------------------------------------
+    # Find role
+    # --------------------------------------------------------
+
     role = get_role_by_id(
         db,
         role_id,
@@ -160,7 +184,7 @@ def delete_existing_role(
         )
 
     # --------------------------------------------------------
-    # CHECK WHETHER ROLE IS ASSIGNED TO USERS
+    # Check whether role is assigned to users
     # --------------------------------------------------------
 
     if role_has_users(
@@ -172,7 +196,7 @@ def delete_existing_role(
         )
 
     # --------------------------------------------------------
-    # DELETE ROLE
+    # Delete role
     # --------------------------------------------------------
 
     delete_role(
@@ -181,4 +205,3 @@ def delete_existing_role(
     )
 
     return role
-

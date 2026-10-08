@@ -1,3 +1,4 @@
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import (
@@ -7,6 +8,10 @@ from sqlalchemy.orm import (
 )
 
 from src.app.core.database import Base
+
+
+if TYPE_CHECKING:
+    from src.app.models.user_model import User
 
 
 class Role(Base):
@@ -47,4 +52,3 @@ class Role(Base):
         "User",
         back_populates="role",
     )
-

@@ -16,6 +16,7 @@ from src.app.repositories.user_repository import (
 )
 
 from src.app.repositories.role_repository import (
+    get_role_by_id,
     get_role_by_name,
 )
 
@@ -70,9 +71,9 @@ def create_new_user(
     # GET DEFAULT MEMBER ROLE
     # --------------------------------------------------------
 
-    member_role = get_role_by_name(
+    member_role = get_role_by_id(
         db,
-        "Member",
+        user_data["role_id"],
     )
 
     if not member_role:

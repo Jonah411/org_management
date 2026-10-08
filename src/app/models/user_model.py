@@ -1,5 +1,5 @@
-
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     String,
@@ -16,6 +16,14 @@ from sqlalchemy.orm import (
 )
 
 from src.app.core.database import Base
+
+
+# ==================================================
+# TYPE CHECKING
+# ==================================================
+
+if TYPE_CHECKING:
+    from src.app.models.role_model import Role
 
 
 class User(Base):
@@ -147,4 +155,3 @@ class User(Base):
         String(255),
         nullable=True,
     )
-
