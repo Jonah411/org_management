@@ -7,10 +7,6 @@ from pydantic_settings import (
 )
 from twilio.rest import Client
 
-# =========================
-# ARGON2 PASSWORD HASHING
-# =========================
-
 from argon2 import PasswordHasher
 from argon2.exceptions import (
     VerifyMismatchError,
@@ -18,23 +14,46 @@ from argon2.exceptions import (
 )
 
 
+# ============================================================
+# PASSWORD HASHER
+# ============================================================
+
 password_hasher = PasswordHasher()
 
 
+# ============================================================
+# SETTINGS
+# ============================================================
+
 class Settings(BaseSettings):
+
+    # ========================================================
+    # JWT
+    # ========================================================
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # ========================================================
+    # TWILIO
+    # ========================================================
 
     TWILIO_ACCOUNT_SID: str
     TWILIO_AUTH_TOKEN: str
     TWILIO_WHATSAPP_FROM: str
     TWILIO_WHATSAPP_TEMPLATE_SID: str
 
-    # AI
-    OPENAI_API_KEY: str
-    OPENAI_MODEL: str
+    # ========================================================
+    # OPENAI
+    # ========================================================
+
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
+    # ========================================================
+    # CONFIG
+    # ========================================================
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -45,14 +64,19 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-# =========================
+# ============================================================
 # JWT
-# =========================
+# ============================================================
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(
+    user_id: int,
+) -> str:
 
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = (
+        datetime.now(timezone.utc)
+        + timedelta(
+            minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     )
 
     payload = {
@@ -67,9 +91,9 @@ def create_access_token(user_id: int) -> str:
     )
 
 
-# =========================
+# ============================================================
 # TWILIO
-# =========================
+# ============================================================
 
 def get_twilio_client() -> Client:
 
@@ -89,13 +113,17 @@ def get_whatsapp_template_sid() -> str:
     return settings.TWILIO_WHATSAPP_TEMPLATE_SID
 
 
-# =========================
+# ============================================================
 # PASSWORD
-# =========================
+# ============================================================
 
-def hash_password(password: str) -> str:
+def hash_password(
+    password: str,
+) -> str:
 
-    return password_hasher.hash(password)
+    return password_hasher.hash(
+        password
+    )
 
 
 def verify_password(
