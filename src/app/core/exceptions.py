@@ -29,3 +29,15 @@ class AuthenticationException(Exception):
     ):
         self.message = message
         super().__init__(self.message)
+
+class AIServiceException(Exception):
+    """Raised when an AI service operation fails."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+class InvalidPasswordException(Exception):
+    def __init__(self, message: str = "Invalid password"):
+        self.message = message
+        super().__init__(self.message)

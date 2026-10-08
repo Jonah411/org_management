@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from src.app.core.exceptions import (
+    InvalidPasswordException,
     UserNotFoundException,
     UserAlreadyExistsException,
     InvalidOTPException,
@@ -119,6 +120,20 @@ async def authentication_exception_handler(
             "success": False,
             "message": exc.message,
             "error_code": "AUTHENTICATION_FAILED",
+            "request_id": request.state.request_id
+        }
+    )
+
+async def invalid_password_exception_handler(
+    request: Request,
+    exc:  InvalidPasswordException
+):
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "success": False,
+            "message": exc.message,
+            "error_code": "INVALID_PASSWORD",
             "request_id": request.state.request_id
         }
     )

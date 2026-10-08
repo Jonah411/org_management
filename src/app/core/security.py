@@ -7,6 +7,19 @@ from pydantic_settings import (
 )
 from twilio.rest import Client
 
+# =========================
+# ARGON2 PASSWORD HASHING
+# =========================
+
+from argon2 import PasswordHasher
+from argon2.exceptions import (
+    VerifyMismatchError,
+    InvalidHashError,
+)
+
+
+password_hasher = PasswordHasher()
+
 
 class Settings(BaseSettings):
 
@@ -19,6 +32,10 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_FROM: str
     TWILIO_WHATSAPP_TEMPLATE_SID: str
 
+    # AI
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
@@ -27,6 +44,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+# =========================
+# JWT
+# =========================
 
 def create_access_token(user_id: int) -> str:
 
@@ -46,6 +67,10 @@ def create_access_token(user_id: int) -> str:
     )
 
 
+# =========================
+# TWILIO
+# =========================
+
 def get_twilio_client() -> Client:
 
     return Client(
@@ -62,3 +87,32 @@ def get_whatsapp_from() -> str:
 def get_whatsapp_template_sid() -> str:
 
     return settings.TWILIO_WHATSAPP_TEMPLATE_SID
+
+
+# =========================
+# PASSWORD
+# =========================
+
+def hash_password(password: str) -> str:
+
+    return password_hasher.hash(password)
+
+
+def verify_password(
+    plain_password: str,
+    hashed_password: str,
+) -> bool:
+
+    try:
+
+        return password_hasher.verify(
+            hashed_password,
+            plain_password,
+        )
+
+    except (
+        VerifyMismatchError,
+        InvalidHashError,
+    ):
+
+        return False

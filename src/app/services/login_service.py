@@ -7,7 +7,8 @@ from src.app.repositories.user_repository import (
 
 from src.app.core.exceptions import (
     UserNotFoundException,
-    InvalidOTPException
+    InvalidOTPException,
+    InvalidPasswordException
 )
 
 from src.app.services.otp_service import (
@@ -16,7 +17,8 @@ from src.app.services.otp_service import (
 )
 
 from src.app.core.security import (
-    create_access_token
+    create_access_token,
+    verify_password
 )
 
 from src.app.services.whatsapp_service import (
@@ -33,8 +35,12 @@ async def create_login(
     user_data: dict
 ):
     phone_number = user_data["phone_number"]
+    password = user_data["password"].get_secret_value()
 
-    # Check user exists
+    # =========================
+    # CHECK USER
+    # =========================
+
     existing_user = get_user_by_phone(
         db,
         phone_number
@@ -45,26 +51,43 @@ async def create_login(
             "Phone number not registered"
         )
 
-    # Generate 6 digit OTP
+    # =========================
+    # VERIFY PASSWORD
+    # =========================
+
+    if not verify_password(
+        password,
+        existing_user.password
+    ):
+        raise InvalidPasswordException(
+            "Invalid password"
+        )
+
+    # =========================
+    # GENERATE OTP
+    # =========================
+
     otp = f"{secrets.randbelow(1_000_000):06d}"
 
-    # Save OTP in Redis
+    # =========================
+    # SAVE OTP IN REDIS
+    # =========================
+
     save_otp(
         phone_number,
         otp
     )
 
-    # Send OTP via SMS
-    # await send_otp_sms(
-    #     phone_number,
-    #     otp
-    # )
-    message_sid =  send_whatsapp_otp(
-    phone_number,
-    otp
-)
+    # =========================
+    # SEND WHATSAPP OTP
+    # =========================
 
-    # Development purpose only
+    message_sid = send_whatsapp_otp(
+        phone_number,
+        otp
+    )
+
+    # Development only
     print(
         f"OTP for {phone_number}: {otp}"
     )
@@ -73,7 +96,6 @@ async def create_login(
         "phone_number": existing_user.phone_number,
         "otp": otp
     }
-    
 
 
 # =========================
@@ -86,8 +108,12 @@ def verify_login(
 ):
     phone_number = user_data["phone_number"]
     otp = user_data["otp"]
+    password = user_data["password"].get_secret_value()
 
-    # Check user exists
+    # =========================
+    # CHECK USER
+    # =========================
+
     existing_user = get_user_by_phone(
         db,
         phone_number
@@ -98,7 +124,22 @@ def verify_login(
             "Phone number not registered"
         )
 
-    # Verify OTP from Redis
+    # =========================
+    # VERIFY PASSWORD
+    # =========================
+
+    if not verify_password(
+        password,
+        existing_user.password
+    ):
+        raise InvalidPasswordException(
+            "Invalid password"
+        )
+
+    # =========================
+    # VERIFY OTP
+    # =========================
+
     is_valid = verify_otp(
         phone_number,
         otp
@@ -109,7 +150,10 @@ def verify_login(
             "Invalid or expired OTP"
         )
 
-    # Generate JWT
+    # =========================
+    # CREATE JWT
+    # =========================
+
     access_token = create_access_token(
         existing_user.id
     )

@@ -21,6 +21,10 @@ router = APIRouter(
 )
 
 
+# =========================
+# SEND OTP
+# =========================
+
 @router.post(
     "",
     response_model=APIResponse[LoginResponse],
@@ -43,6 +47,10 @@ async def create_login(
         request_id=request.state.request_id,
     )
 
+
+# =========================
+# VERIFY OTP + PASSWORD
+# =========================
 
 @router.post(
     "/verify",
