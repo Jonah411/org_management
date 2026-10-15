@@ -1,0 +1,39 @@
+[1912] 15 Oct 11:53:42.761 # --- Memurai is starting ---
+[1912] 15 Oct 11:53:42.762 # License file: C:\Program Files\Memurai\memurai-license-dev.txt
+[1912] 15 Oct 11:53:42.762 # Memurai licensed to Memurai DEV Team with license ID b3833d7d-90c5-4732-907b-69b509a3f278
+[1912] 15 Oct 11:53:42.762 # Memurai for Redis version=8.2.0, API=8.2.10, instance-name=, pid=1912, just started
+[1912] 15 Oct 11:53:42.762 # This is a Release Candidate version of Memurai
+[1912] 15 Oct 11:53:42.762 # Production use is NOT allowed under this license.
+[1912] 15 Oct 11:53:42.762 # This Memurai license enforces automatic shutdown after 10 days. For more details see: https://www.memurai.com/faq
+[1912] 15 Oct 11:53:42.762 * Configuration loaded
+[1912] 15 Oct 11:53:42.762 * monotonic clock: Windows QueryPerformanceCounter
+[1912] 15 Oct 11:53:42.762 * License Plan: Developer, running mode=standalone, port=6379.
+[1912] 15 Oct 11:53:42.778 # Memurai QID = D4D88CD27469B588;DCD7BA060DB0B45D;F8B38D8E58AC6285;64EEEC4D5D98B71B;DCD7B7060DB0AF44
+[1912] 15 Oct 11:53:42.778 * Server initialized
+[1912] 15 Oct 11:53:42.778 * Ready to accept connections tcp
+[1912] 15 Oct 12:09:20.583 * User requested shutdown...
+[1912] 15 Oct 12:09:20.583 * Saving the final RDB snapshot before exiting.
+[1912] 15 Oct 12:09:20.583 * DB saved on disk
+[1912] 15 Oct 12:09:21.238 # Memurai is now ready to exit, bye bye...
+[40424] 15 Oct 12:36:46.871 # --- Memurai is starting ---
+[40424] 15 Oct 12:36:46.875 # License file: C:\Program Files\Memurai\memurai-license-dev.txt
+[40424] 15 Oct 12:36:46.875 # Memurai licensed to Memurai DEV Team with license ID b3833d7d-90c5-4732-907b-69b509a3f278
+[40424] 15 Oct 12:36:46.875 # Memurai for Redis version=8.2.0, API=8.2.10, instance-name=, pid=40424, just started
+[40424] 15 Oct 12:36:46.875 # This is a Release Candidate version of Memurai
+[40424] 15 Oct 12:36:46.875 # Production use is NOT allowed under this license.
+[40424] 15 Oct 12:36:46.875 # This Memurai license enforces automatic shutdown after 10 days. For more details see: https://www.memurai.com/faq
+[40424] 15 Oct 12:36:46.875 * Configuration loaded
+[40424] 15 Oct 12:36:46.884 * monotonic clock: Windows QueryPerformanceCounter
+[40424] 15 Oct 12:36:46.886 * License Plan: Developer, running mode=standalone, port=6379.
+[40424] 15 Oct 12:36:46.893 # Memurai QID = D4D88CD27469B588;DCD7BA060DB0B45D;F8B38D8E58AC6285;64EEEC4D5D98B71B;DCD7B7060DB0AF44
+[40424] 15 Oct 12:36:46.893 * Server initialized
+[40424] 15 Oct 12:36:46.895 * Loading RDB produced by version 8.2.10
+[40424] 15 Oct 12:36:46.897 * RDB age 1646 seconds
+[40424] 15 Oct 12:36:46.897 * RDB memory usage when created 0.64 Mb
+[40424] 15 Oct 12:36:46.897 * Done loading RDB, keys loaded: 0, keys expired: 0.
+[40424] 15 Oct 12:36:46.897 * DB loaded from disk: 0.003 seconds
+[40424] 15 Oct 12:36:46.897 * Ready to accept connections tcp
+[40424] 15 Oct 13:36:47.031 * 1 changes in 3600 seconds. Saving...
+[40424] 15 Oct 13:36:47.052 * Background saving started by pid 44936
+[44936] 15 Oct 13:36:47.142 * DB saved on disk
+[40424] 15 Oct 13:36:47.161 * Background saving terminated with success

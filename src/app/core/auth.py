@@ -1,26 +1,20 @@
-from fastapi import Depends
 
+from fastapi import Depends
 from fastapi.security import (
     HTTPBearer,
-    HTTPAuthorizationCredentials
+    HTTPAuthorizationCredentials,
 )
-
 from jose import JWTError, jwt
 
 from src.app.core.security import settings
-
-from src.app.core.exceptions import (
-    AuthenticationException
-)
+from src.app.core.exceptions import AuthenticationException
 
 
-security = HTTPBearer(
-    auto_error=False
-)
+security = HTTPBearer(auto_error=False)
 
 
 def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security)
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> int:
 
     if credentials is None:
@@ -34,19 +28,52 @@ def get_current_user_id(
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
+            algorithms=[settings.JWT_ALGORITHM],
         )
 
         user_id = payload.get("sub")
 
         if user_id is None:
-            raise AuthenticationException(
-                "Invalid token"
-            )
+            raise AuthenticationException("Invalid token")
 
         return int(user_id)
 
-    except (JWTError, ValueError):
+    except AuthenticationException:
+        raise
+
+    except (JWTError, ValueError, TypeError) as exc:
         raise AuthenticationException(
             "Invalid or expired token"
+        ) from exc
+
+
+def get_optional_current_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> int | None:
+
+    if credentials is None:
+        return None
+
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
         )
+
+        user_id = payload.get("sub")
+
+        if user_id is None:
+            raise AuthenticationException("Invalid token")
+
+        return int(user_id)
+
+    except AuthenticationException:
+        raise
+
+    except (JWTError, ValueError, TypeError) as exc:
+        raise AuthenticationException(
+            "Invalid or expired token"
+        ) from exc

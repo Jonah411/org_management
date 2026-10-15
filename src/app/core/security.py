@@ -52,6 +52,25 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
 
     # ========================================================
+    # OPENAI
+    # ========================================================
+    
+    YMCA_UPI_VPA: str | None = None
+    YMCA_UPI_PAYEE_NAME: str | None = None
+
+    # PHONEPE
+    PHONEPE_ENV: str = "sandbox"
+    PHONEPE_CLIENT_ID: str | None = None
+    PHONEPE_CLIENT_SECRET: str | None = None
+    PHONEPE_CLIENT_VERSION: str = "1"
+    PHONEPE_REDIRECT_URL: str | None = None
+
+    # PhonePe webhook SHA authentication
+    PHONEPE_WEBHOOK_USERNAME: str | None = None
+    PHONEPE_WEBHOOK_PASSWORD: str | None = None
+    
+
+    # ========================================================
     # CONFIG
     # ========================================================
 
