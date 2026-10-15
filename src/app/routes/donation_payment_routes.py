@@ -1,4 +1,3 @@
-
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
@@ -46,11 +45,6 @@ def require_admin(
     db: Session,
     user_id: int,
 ) -> User:
-    """
-    Assumes User.role is either a role name or a relationship
-    whose name attribute is 'Admin'.
-    Adapt this helper if your project stores role_id instead.
-    """
     user = db.get(User, user_id)
 
     if user is None:
@@ -76,7 +70,6 @@ def verify_manual_donation(
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_current_user_id),
 ):
-    # Admin authorization is mandatory.
     require_admin(db, admin_id)
 
     transaction_reference = body.transaction_reference.strip()
@@ -112,13 +105,10 @@ def verify_manual_donation(
                 "Only pending donations can be verified"
             )
 
-        # Prevent the same UPI reference from being applied to
-        # a different donation. A DB unique constraint is stronger.
         existing_donation = (
             db.query(Donation)
             .filter(
-                Donation.transaction_reference
-                == transaction_reference,
+                Donation.transaction_reference == transaction_reference,
                 Donation.id != donation_id,
             )
             .first()
@@ -129,10 +119,7 @@ def verify_manual_donation(
                 "This transaction reference is already used"
             )
 
-        # IMPORTANT:
-        # Call this endpoint only after the Admin independently
-        # verifies the recipient, amount, date and UPI reference
-        # against trusted bank/UPI records.
+        # Verify the transaction against trusted bank/UPI records first.
         donation.transaction_reference = transaction_reference
         donation.payment_status = "SUCCESS"
         donation.verified_by_user_id = admin_id
@@ -149,9 +136,7 @@ def verify_manual_donation(
                 "payment_status": _normalized(
                     donation.payment_status
                 ),
-                "transaction_reference": (
-                    donation.transaction_reference
-                ),
+                "transaction_reference": donation.transaction_reference,
                 "verified_by_user_id": admin_id,
                 "verified_at": donation.verified_at,
             },
@@ -171,13 +156,13 @@ def verify_manual_donation(
 
 
 @router.post("/{donation_id}/phonepe")
-def start_phonepe_payment(
+async def start_phonepe_payment(
     donation_id: UUID,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        data = create_phonepe_payment(
+        data = await create_phonepe_payment(
             db=db,
             donation_id=donation_id,
             authenticated_user_id=user_id,
@@ -200,6 +185,10 @@ def start_phonepe_payment(
         raise PaymentGatewayUnavailableException() from exc
 
     except (ValueError, TypeError) as exc:
+        logger.exception(
+            "Invalid PhonePe checkout data for donation %s",
+            donation_id,
+        )
         raise InvalidDonationException(
             message="Unable to initialize this donation payment"
         ) from exc

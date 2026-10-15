@@ -19,6 +19,7 @@ from src.app.core.exceptions import (
     InvalidDonationException,
     UPIConfigurationException,
     UPIQRNotAvailableException,
+    PaymentEventConflictException
 )
 
 
@@ -345,4 +346,18 @@ async def internal_server_exception_handler(
         message="Something went wrong",
         error_code="INTERNAL_SERVER_ERROR",
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+async def payment_event_conflict_handler(
+    request: Request,
+    exc: PaymentEventConflictException,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "success": False,
+            "message": str(exc),
+            "data": None,
+            "request_id": getattr(request.state, "request_id", None),
+        },
     )

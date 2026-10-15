@@ -1,8 +1,8 @@
-
 import hashlib
 import hmac
 import json
 import logging
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -30,15 +30,27 @@ router = APIRouter(
     tags=["Payment Webhooks"],
 )
 
+SUPPORTED_EVENTS = {
+    "checkout.order.completed",
+    "checkout.order.failed",
+}
+
+
+def normalize_status(value) -> str:
+    """Normalize Enum or string values."""
+    return str(getattr(value, "value", value) or "").strip().upper()
+
 
 def verify_phonepe_webhook_auth(
     authorization: str | None,
 ) -> bool:
     """
-    Verify the SHA-256(username:password) format.
+    Validate SHA-256(username:password).
 
-    Use this only if this matches the authentication format
-    configured for your PhonePe webhook.
+    IMPORTANT:
+    This must match the authentication format configured for
+    your actual PhonePe PG webhook. Do not assume all PhonePe
+    integrations use this exact format.
     """
     username = settings.PHONEPE_WEBHOOK_USERNAME
     password = settings.PHONEPE_WEBHOOK_PASSWORD
@@ -58,27 +70,80 @@ def verify_phonepe_webhook_auth(
     return hmac.compare_digest(expected, provided)
 
 
-def normalize_status(value) -> str:
-    return str(getattr(value, "value", value)).upper()
-
-
 def verify_amount(donation: Donation, gateway_amount) -> None:
     """
-    Donation amount is assumed to be stored in rupees.
-    PhonePe gateway amount is expected in paise.
+    Assumption:
+    donation.amount is stored in rupees.
+    PhonePe checkout amount is returned in paise.
     """
     if gateway_amount is None:
         raise PhonePePaymentException(
-            "Payment amount is missing from gateway response"
+            "Payment amount is missing from PhonePe response"
         )
 
-    expected_paise = int(round(float(donation.amount) * 100))
-    actual_paise = int(gateway_amount)
+    try:
+        expected_paise = int(round(float(donation.amount) * 100))
+        actual_paise = int(gateway_amount)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise PhonePePaymentException(
+            "Invalid payment amount received from PhonePe"
+        ) from exc
 
     if expected_paise != actual_paise:
+        logger.warning(
+            "PhonePe amount mismatch for donation_id=%s",
+            donation.id,
+        )
         raise PhonePePaymentException(
             "Payment amount does not match the donation amount"
         )
+
+
+def get_completed_transaction_reference(
+    verified: dict,
+) -> str | None:
+    """
+    Extract a transaction reference from the verified order response.
+    Check the actual PhonePe response schema for your PG integration.
+    """
+    payment_details = verified.get("paymentDetails") or []
+
+    if not isinstance(payment_details, list):
+        raise InvalidPaymentWebhookException(
+            "Invalid payment details from PhonePe"
+        )
+
+    expected_amount = verified.get("amount")
+
+    for payment in payment_details:
+        if not isinstance(payment, dict):
+            continue
+
+        if normalize_status(payment.get("state")) != "COMPLETED":
+            continue
+
+        payment_amount = payment.get("amount")
+
+        if payment_amount is None or expected_amount is None:
+            continue
+
+        try:
+            if int(payment_amount) != int(expected_amount):
+                continue
+        except (TypeError, ValueError, OverflowError):
+            continue
+
+        transaction_reference = (
+            payment.get("transactionId")
+            or payment.get("rail", {}).get("utr")
+            if isinstance(payment.get("rail"), dict)
+            else payment.get("transactionId")
+        )
+
+        if transaction_reference:
+            return str(transaction_reference)
+
+    return None
 
 
 @router.post("/phonepe")
@@ -87,7 +152,7 @@ async def phonepe_webhook(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    # 1. Authenticate the incoming webhook.
+    # 1. Authenticate webhook request.
     if not verify_phonepe_webhook_auth(authorization):
         logger.warning(
             "PhonePe webhook authentication failed; header_present=%s",
@@ -98,9 +163,10 @@ async def phonepe_webhook(
             detail="Invalid PhonePe webhook authentication",
         )
 
-    # 2. Parse and validate the incoming JSON.
+    # 2. Read raw request body for validation and idempotency.
+    raw_body = await request.body()
+
     try:
-        raw_body = await request.body()
         body = json.loads(raw_body)
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise InvalidPaymentWebhookException(
@@ -112,6 +178,7 @@ async def phonepe_webhook(
             "Webhook body must be a JSON object"
         )
 
+    event_type = body.get("event")
     payload = body.get("payload")
 
     if not isinstance(payload, dict):
@@ -119,7 +186,6 @@ async def phonepe_webhook(
             "Webhook payload is missing"
         )
 
-    event_type = body.get("event")
     merchant_order_id = payload.get("merchantOrderId")
 
     if not event_type or not merchant_order_id:
@@ -127,11 +193,8 @@ async def phonepe_webhook(
             "Webhook event or merchant order ID is missing"
         )
 
-    # Ignore events unrelated to payment completion/failure.
-    if event_type not in (
-        "checkout.order.completed",
-        "checkout.order.failed",
-    ):
+    # 3. Ignore events that do not concern order completion/failure.
+    if event_type not in SUPPORTED_EVENTS:
         return {
             "success": True,
             "message": "Webhook event ignored",
@@ -140,7 +203,7 @@ async def phonepe_webhook(
     event_hash = hashlib.sha256(raw_body).hexdigest()
 
     try:
-        # 3. Check whether this exact webhook body was processed.
+        # 4. Ignore exact webhook deliveries already processed.
         duplicate = (
             db.query(PaymentWebhookEvent)
             .filter(PaymentWebhookEvent.event_hash == event_hash)
@@ -153,7 +216,7 @@ async def phonepe_webhook(
                 "message": "Duplicate webhook ignored",
             }
 
-        # 4. Lock the donation record.
+        # 5. Locate and lock the donation using our merchant order ID.
         donation = (
             db.query(Donation)
             .filter(
@@ -167,20 +230,27 @@ async def phonepe_webhook(
         if donation is None:
             raise DonationNotFoundException()
 
-        if normalize_status(donation.payment_method) != "PHONEPE":
+        # 6. Confirm that this donation was created for PhonePe.
+        payment_method = normalize_status(donation.payment_method)
+
+        if payment_method not in {"PHONEPE", "PHONE_PE"}:
+            logger.warning(
+                "PhonePe webhook rejected: donation_id=%s, payment_method=%s",
+                donation.id,
+                payment_method,
+            )
             raise InvalidPaymentWebhookException(
-                "Donation payment method is not PhonePe"
+                "Donation was not created for PhonePe checkout"
             )
 
-        # 5. Never trust the webhook payload alone.
-        # Verify the order using the PhonePe status API.
+        # 7. Ask PhonePe's server for the authoritative order status.
         try:
             verified = await get_checkout_status(
                 merchant_order_id
             )
         except httpx.HTTPError as exc:
             logger.exception(
-                "PhonePe status verification request failed"
+                "PhonePe order status request failed"
             )
             raise PaymentGatewayUnavailableException() from exc
 
@@ -189,77 +259,80 @@ async def phonepe_webhook(
                 "Invalid response from PhonePe status API"
             )
 
-        if verified.get("merchantOrderId") != merchant_order_id:
+        verified_order_id = verified.get("merchantOrderId")
+
+        if verified_order_id != merchant_order_id:
             raise InvalidPaymentWebhookException(
-                "Gateway order ID does not match"
+                "PhonePe merchant order ID does not match"
             )
 
         gateway_state = normalize_status(verified.get("state"))
 
-        # 6. Verify the amount before updating the donation.
-        verify_amount(donation, verified.get("amount"))
-
-        # Record this webhook for idempotency.
-        db.add(
-            PaymentWebhookEvent(
-                event_hash=event_hash,
-                provider="PHONEPE",
-            )
+        # 8. Validate the amount before changing payment status.
+        verify_amount(
+            donation,
+            verified.get("amount"),
         )
 
         current_status = normalize_status(donation.payment_status)
 
-        # Never downgrade a successful payment.
+        # Never downgrade a successful donation.
         if current_status == "SUCCESS":
+            # Save this event so the same delivery is not processed again.
+            db.add(
+                PaymentWebhookEvent(
+                    event_hash=event_hash,
+                    provider="PHONEPE",
+                )
+            )
             db.commit()
+
             return {
                 "success": True,
                 "message": "Donation already verified",
                 "payment_status": "SUCCESS",
             }
 
-        # 7. Mark successful only when gateway confirms completion.
+        # 9. Process only when event and verified gateway state agree.
         if (
             event_type == "checkout.order.completed"
             and gateway_state == "COMPLETED"
         ):
-            payment_details = verified.get("paymentDetails") or []
-
-            if not isinstance(payment_details, list):
-                raise InvalidPaymentWebhookException(
-                    "Invalid payment details from gateway"
-                )
-
-            matching_payment = next(
-                (
-                    item
-                    for item in payment_details
-                    if isinstance(item, dict)
-                    and normalize_status(item.get("state"))
-                    == "COMPLETED"
-                    and item.get("amount") is not None
-                    and int(item["amount"])
-                    == int(verified["amount"])
-                ),
-                None,
+            transaction_reference = (
+                get_completed_transaction_reference(verified)
             )
 
-            if matching_payment is None:
+            if not transaction_reference:
                 raise PhonePePaymentException(
                     "No completed payment matching the order amount"
                 )
 
-            transaction_reference = (
-                matching_payment.get("transactionId")
-                or verified.get("orderId")
+            # Prevent one transaction reference from being assigned
+            # to multiple donations.
+            existing_reference = (
+                db.query(Donation)
+                .filter(
+                    Donation.transaction_reference
+                    == transaction_reference,
+                    Donation.id != donation.id,
+                )
+                .first()
             )
+
+            if existing_reference:
+                logger.error(
+                    "PhonePe transaction reference is already associated "
+                    "with another donation; donation_id=%s",
+                    donation.id,
+                )
+                raise PhonePePaymentException(
+                    "This transaction reference is already used"
+                )
 
             donation.payment_status = "SUCCESS"
             donation.transaction_reference = transaction_reference
 
-            # Save verification metadata when these model fields exist.
             if hasattr(donation, "verified_at"):
-                from datetime import datetime, timezone
                 donation.verified_at = datetime.now(timezone.utc)
 
         elif (
@@ -269,13 +342,23 @@ async def phonepe_webhook(
             donation.payment_status = "FAILED"
 
         else:
-            # Event and verified gateway state do not agree.
-            # Keep the current donation status unchanged.
+            # Pending states and event/status mismatches must not
+            # falsely mark a donation successful or failed.
             logger.warning(
-                "PhonePe webhook state mismatch: event=%s state=%s",
+                "PhonePe event/status mismatch: event=%s, state=%s, "
+                "merchant_order_id=%s",
                 event_type,
                 gateway_state,
+                merchant_order_id,
             )
+
+        # 10. Store event and donation status in the same transaction.
+        db.add(
+            PaymentWebhookEvent(
+                event_hash=event_hash,
+                provider="PHONEPE",
+            )
+        )
 
         db.commit()
         db.refresh(donation)
@@ -291,7 +374,7 @@ async def phonepe_webhook(
     except IntegrityError as exc:
         db.rollback()
 
-        # A concurrent request may have inserted the same event.
+        # A concurrent delivery might have inserted this event first.
         duplicate = (
             db.query(PaymentWebhookEvent)
             .filter(PaymentWebhookEvent.event_hash == event_hash)
@@ -304,7 +387,9 @@ async def phonepe_webhook(
                 "message": "Duplicate webhook ignored",
             }
 
-        logger.exception("PhonePe webhook database constraint error")
+        logger.exception(
+            "PhonePe webhook database constraint error"
+        )
         raise PaymentGatewayUnavailableException() from exc
 
     except AppException:
@@ -313,5 +398,7 @@ async def phonepe_webhook(
 
     except Exception as exc:
         db.rollback()
-        logger.exception("Unexpected PhonePe webhook processing error")
+        logger.exception(
+            "Unexpected PhonePe webhook processing error"
+        )
         raise PaymentGatewayUnavailableException() from exc

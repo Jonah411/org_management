@@ -37,3 +37,11 @@
 [40424] 15 Oct 13:36:47.052 * Background saving started by pid 44936
 [44936] 15 Oct 13:36:47.142 * DB saved on disk
 [40424] 15 Oct 13:36:47.161 * Background saving terminated with success
+[40424] 15 Oct 15:36:18.031 * 1 changes in 3600 seconds. Saving...
+[40424] 15 Oct 15:36:18.051 * Background saving started by pid 42896
+[42896] 15 Oct 15:36:18.148 * DB saved on disk
+[40424] 15 Oct 15:36:18.165 * Background saving terminated with success
+[40424] 15 Oct 16:36:19.107 * 1 changes in 3600 seconds. Saving...
+[40424] 15 Oct 16:36:19.123 * Background saving started by pid 8284
+[8284] 15 Oct 16:36:19.199 * DB saved on disk
+[40424] 15 Oct 16:36:19.231 * Background saving terminated with success

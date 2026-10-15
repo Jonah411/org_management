@@ -49,6 +49,7 @@ from src.app.core.exception_handlers import (
     upi_configuration_exception_handler,
     upi_qr_not_available_handler,
     app_exception_handler,
+    payment_event_conflict_handler
 )
 
 
@@ -69,6 +70,7 @@ from src.app.core.exceptions import (
     InvalidDonationException,
     UPIConfigurationException,
     UPIQRNotAvailableException,
+    PaymentEventConflictException
 )
 
 
@@ -183,7 +185,10 @@ app.add_exception_handler(
     UPIQRNotAvailableException,
     upi_qr_not_available_handler,
 )
-
+app.add_exception_handler(
+    PaymentEventConflictException,
+    payment_event_conflict_handler,
+)
 # --------------------------------------------------
 # Routes
 # --------------------------------------------------
